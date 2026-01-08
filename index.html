@@ -35,13 +35,13 @@ async function checkCar() {
     loader.style.display = 'block';
 
     try {
-        // פנייה ישירה למאגר ללא גורם מתווך להאצת המהירות
-        const url = `https://data.gov.il/api/3/action/datastore_search?resource_id=053ad243-11e8-4242-ac28-58a74acad3b3&filters={"mispar_rechev":"${num}"}`;
+        // אנחנו משתמשים ב"מתווך" (Proxy) כדי שהדפדפן לא יחסום את המידע הממשלתי
+        const apiUrl = `https://data.gov.il/api/3/action/datastore_search?resource_id=053ad243-11e8-4242-ac28-58a74acad3b3&filters={"mispar_rechev":"${num}"}`;
+        const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`;
         
-        const response = await fetch(url);
-        if (!response.ok) throw new Error();
-        
-        const data = await response.json();
+        const response = await fetch(proxyUrl);
+        const proxyData = await response.json();
+        const data = JSON.parse(proxyData.contents);
         const car = data.result.records[0];
 
         if (car) {
@@ -59,7 +59,7 @@ async function checkCar() {
             res.style.display = 'block';
         }
     } catch (e) {
-        res.innerHTML = '⚠️ המאגר הממשלתי לא מגיב. נסה שוב בעוד דקה.';
+        res.innerHTML = '⚠️ תקלה בחיבור. נסה שוב בעוד כמה שניות.';
         res.style.display = 'block';
     } finally {
         loader.style.display = 'none';
