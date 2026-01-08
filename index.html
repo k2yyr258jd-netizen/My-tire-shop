@@ -92,6 +92,30 @@ function saveToHistory(num) {
     }
 }
 
+async function fetchWithFallback(govUrl) {
+    // רשימת שרתי תיווך לגיבוי
+    const proxies = [
+        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(govUrl)}`,
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(govUrl)}`
+    ];
+
+    let lastError;
+
+    for (const proxyUrl of proxies) {
+        try {
+            console.log("Trying proxy:", proxyUrl);
+            const response = await fetch(proxyUrl);
+            if (!response.ok) throw new Error(`Status ${response.status}`);
+            const data = await response.json();
+            return data; // הצלחה!
+        } catch (e) {
+            console.warn("Proxy failed, trying next...", e);
+            lastError = e;
+        }
+    }
+    throw lastError; // אם כולם נכשלו
+}
+
 async function checkCar() {
     let num = document.getElementById('carNum').value.replace(/\D/g, '');
     const res = document.getElementById('res');
@@ -102,32 +126,21 @@ async function checkCar() {
 
     res.style.display = 'none';
     loader.style.display = 'block';
-    debug.innerText = 'מתחבר לשרת...';
+    debug.innerText = 'מנסה להתחבר למאגר...';
 
     const resourceId = '053ad243-11e8-4242-ac28-58a74acad3b3';
-    // בניית הכתובת לשרת הממשלתי
     const govUrl = `https://data.gov.il/api/3/action/datastore_search?resource_id=${resourceId}&q=${num}`;
-    
-    // שימוש בשרת תיווך חדש (corsproxy.io) שהוא יותר יציב לאייפון
-    const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(govUrl);
 
     try {
-        const response = await fetch(proxyUrl);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        // בשרת החדש אנחנו מקבלים את המידע ישר, בלי צורך ב"קילוף"
-        const data = await response.json();
+        // שימוש בפונקציית הגיבוי החכמה
+        const data = await fetchWithFallback(govUrl);
 
         if (data.result && data.result.records) {
-            // סינון מדויק כדי לוודא שזה הרכב הנכון
             const car = data.result.records.find(r => String(r.mispar_rechev).includes(num));
 
             if (car) {
                 saveToHistory(num);
-                debug.innerText = ''; // ניקוי הודעות דיבאג בהצלחה
+                debug.innerText = '';
                 
                 const details = {
                     model: car.tozeret_nm,
@@ -152,15 +165,14 @@ async function checkCar() {
             } else {
                 res.innerHTML = '<div style="padding:15px; color:red; font-weight:bold;">❌ רכב לא נמצא במאגר</div>';
                 res.style.display = 'block';
-                debug.innerText = 'סטטוס: התקבל מידע אך הרכב לא נמצא';
+                debug.innerText = 'התקבל מידע אך המספר לא נמצא';
             }
         }
     } catch (e) {
         console.error(e);
         res.innerHTML = '<div style="padding:15px; color:#e67e22;">⚠️ שגיאת תקשורת</div>';
         res.style.display = 'block';
-        // הצגת השגיאה האמיתית למטה
-        debug.innerText = 'שגיאה טכנית: ' + e.message;
+        debug.innerText = 'נכשל בכל הניסיונות: ' + e.message;
     } finally {
         loader.style.display = 'none';
     }
