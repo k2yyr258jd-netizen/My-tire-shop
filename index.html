@@ -18,50 +18,57 @@
 <body>
     <header><h1>צמיגיית המקצוענים 🚗</h1></header>
     <div class="card">
-        <input type="tel" id="carNum" placeholder="מספר רכב (למשל 5495178)">
+        <input type="tel" id="carNum" placeholder="הכנס מספר רכב">
         <button onclick="checkCar()">בדוק פרטי רכב</button>
         <div id="loader" class="loader"></div>
         <div id="res"></div>
     </div>
 
 <script>
-async function checkCar() {
+// פונקציית העזר שתקבל את הנתונים מהממשלה
+function handleResponse(data) {
+    const res = document.getElementById('res');
+    const loader = document.getElementById('loader');
+    loader.style.display = 'none';
+    
+    if (data.result && data.result.records && data.result.records.length > 0) {
+        const car = data.result.records[0];
+        res.innerHTML = `
+            <div style="text-align:center; font-weight:bold; color:#d35400; margin-bottom:10px;">נתוני רכב</div>
+            <strong>🚗 דגם:</strong> ${car.tozeret_nm} ${car.kinuy_mishari || ''}<br>
+            <strong>📅 שנה:</strong> ${car.shnat_yitzur}<br>
+            <strong>📏 צמיג קדמי:</strong> ${car.zmig_kidmi || 'בדיקה פיזית'}<br>
+            <strong>📏 צמיג אחורי:</strong> ${car.zmig_ahori || 'בדיקה פיזית'}<br>
+            <strong>⏳ טסט עד:</strong> <span style="color:red; font-weight:bold;">${car.mivchan_acharon_dt ? car.mivchan_acharon_dt.split('T')[0] : 'לא ידוע'}</span>
+        `;
+        res.style.display = 'block';
+    } else {
+        res.innerHTML = '❌ מספר הרכב לא נמצא במאגר.';
+        res.style.display = 'block';
+    }
+}
+
+function checkCar() {
     const num = document.getElementById('carNum').value.trim();
     const res = document.getElementById('res');
     const loader = document.getElementById('loader');
+    
     if(!num) return;
-
     res.style.display = 'none';
     loader.style.display = 'block';
 
-    try {
-        // שימוש בחיפוש חופשי שעוקף הרבה בעיות חסימה
-        const response = await fetch(`https://data.gov.il/api/3/action/datastore_search?resource_id=053ad243-11e8-4242-ac28-58a74acad3b3&q=${num}`);
-        const data = await response.json();
-        
-        // סינון התוצאה המדויקת ביותר
-        const car = data.result.records.find(r => String(r.mispar_rechev).includes(num));
-
-        if (car) {
-            res.innerHTML = `
-                <div style="text-align:center; font-weight:bold; color:#d35400; margin-bottom:10px; border-bottom:1px solid #ddd;">נתוני משרד התחבורה</div>
-                <strong>🚗 דגם:</strong> ${car.tozeret_nm} ${car.kinuy_mishari || ''}<br>
-                <strong>📅 שנה:</strong> ${car.shnat_yitzur}<br>
-                <strong>📏 צמיג קדמי:</strong> ${car.zmig_kidmi || 'בדיקה פיזית'}<br>
-                <strong>📏 צמיג אחורי:</strong> ${car.zmig_ahori || 'בדיקה פיזית'}<br>
-                <strong>⏳ טסט עד:</strong> <span style="color:red; font-weight:bold;">${car.mivchan_acharon_dt ? car.mivchan_acharon_dt.split('T')[0] : 'לא ידוע'}</span>
-            `;
-            res.style.display = 'block';
-        } else {
-            res.innerHTML = '❌ הרכב לא נמצא במאגר.';
-            res.style.display = 'block';
-        }
-    } catch (e) {
-        res.innerHTML = '⚠️ המאגר עמוס, נסה שוב בעוד כמה שניות.';
-        res.style.display = 'block';
-    } finally {
+    // יצירת בקשת JSONP שעוקפת חסימות דפדפן
+    const script = document.createElement('script');
+    script.src = `https://data.gov.il/api/3/action/datastore_search?resource_id=053ad243-11e8-4242-ac28-58a74acad3b3&filters={"mispar_rechev":"${num}"}&callback=handleResponse`;
+    
+    // טיפול במקרה של שגיאה בטעינת הסקריפט
+    script.onerror = function() {
         loader.style.display = 'none';
-    }
+        res.innerHTML = '⚠️ תקלה בחיבור למאגר הממשלתי. נסה שוב.';
+        res.style.display = 'block';
+    };
+    
+    document.body.appendChild(script);
 }
 </script>
 </body>
