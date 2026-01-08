@@ -3,52 +3,83 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>צמיגיית המקצוענים - שירות בדרך</title>
+    <title>צמיגיית המקצוענים - בדיקת רכב</title>
     <link rel="manifest" href="manifest.json">
     <style>
-        body { font-family: sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; text-align: center; }
-        header { background-color: #333; color: #ffcc00; padding: 20px; }
-        .action-buttons { display: flex; justify-content: center; gap: 10px; padding: 20px; }
-        .btn { text-decoration: none; padding: 15px 25px; border-radius: 50px; font-weight: bold; color: white; flex: 1; max-width: 150px; }
+        body { font-family: sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; text-align: center; color: #333; }
+        header { background-color: #333; color: #ffcc00; padding: 15px; }
+        .container { padding: 15px; }
+        .search-section { background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        input { width: 80%; padding: 12px; font-size: 18px; border: 2px solid #ddd; border-radius: 5px; text-align: center; margin-bottom: 10px; }
+        .search-btn { background-color: #ffcc00; color: #333; border: none; padding: 12px 25px; font-weight: bold; border-radius: 5px; cursor: pointer; width: 85%; }
+        #result { margin-top: 15px; text-align: right; display: none; background: #e9ecef; padding: 15px; border-radius: 5px; }
+        .action-buttons { display: flex; justify-content: center; gap: 10px; margin: 20px 0; }
+        .btn { text-decoration: none; padding: 12px; border-radius: 5px; font-weight: bold; color: white; flex: 1; }
         .call-btn { background-color: #28a745; }
         .waze-btn { background-color: #0099ff; }
-        .services { background: white; margin: 20px auto; padding: 20px; width: 90%; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        table { width: 100%; border-collapse: collapse; }
-        td { padding: 10px; border-bottom: 1px solid #ddd; }
-        .price { font-weight: bold; color: #d9534f; }
-        footer { margin-top: 30px; padding: 20px; font-size: 0.9em; color: #666; }
+        .loader { display: none; border: 4px solid #f3f3f3; border-top: 4px solid #333; border-radius: 50%; width: 30px; height: 30px; animation: spin 2s linear infinite; margin: 10px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
 
 <header>
     <h1>צמיגיית המקצוענים 🚗</h1>
-    <p>פנצ'ריה, חנות צמיגים ואביזרי רכב</p>
 </header>
 
-<div class="action-buttons">
-    <a href="tel:0549475566 class="btn call-btn">📞 התקשר עכשיו</a>
-    <a href="https://waze.com/ul?q=הרימון 1 אבן יהודהclass="btn waze-btn">📍 ניווט בוויז</a>
+<div class="container">
+    <div class="search-section">
+        <h3>בדיקת פרטי רכב וצמיגים</h3>
+        <input type="number" id="carNumber" placeholder="הכנס מספר רכב (למשל 12345678)">
+        <button class="search-btn" onclick="searchCar()">בדוק פרטים</button>
+        <div id="loader" class="loader"></div>
+        <div id="result"></div>
+    </div>
+
+    <div class="action-buttons">
+        <a href="tel:0501234567" class="btn call-btn">📞 התקשר</a>
+        <a href="https://waze.com/ul?q=הרימון_1_אבן_יהודה" class="btn waze-btn">📍 ניווט</a>
+    </div>
 </div>
 
-<div class="services">
-    <h2>השירותים שלנו</h2>
-    <table>
-        <tr>
-            <td>תיקון פנצ'ר</td>
-            <td class="price">₪50 - ₪70</td>
-        </tr>
-        <tr>
-            <td>החלפת צמיג</td>
-            <td class="price">לפי דגם</td>
-        </tr>
-    </table>
-</div>
+<script>
+async function searchCar() {
+    const carNum = document.getElementById('carNumber').value;
+    const resultDiv = document.getElementById('result');
+    const loader = document.getElementById('loader');
+    
+    if (!carNum) { alert('נא להזין מספר רכב'); return; }
 
-<footer>
-    <p>כתובת: הרימון 1 אבן יהודה ך</p>
-    <p>&copy; 2026 צמיגיית המקצוענים</p>
-</footer>
+    resultDiv.style.display = 'none';
+    loader.style.display = 'block';
+
+    try {
+        // פנייה למאגר משרד התחבורה
+        const response = await fetch(`https://data.gov.il/api/3/action/datastore_search?resource_id=053ad243-11e8-4242-ac28-58a74acad3b3&filters={"mispar_rechev":"${carNum}"}`);
+        const data = await response.json();
+        
+        if (data.result.records.length > 0) {
+            const car = data.result.records[0];
+            resultDiv.innerHTML = `
+                <strong>🚗 רכב:</strong> ${car.tozeret_nm} ${car.kinuy_mishari}<br>
+                <strong>📅 שנת ייצור:</strong> ${car.shnat_yitzur}<br>
+                <strong>📏 צמיג קדמי:</strong> ${car.zmig_kidmi}<br>
+                <strong>📏 צמיג אחורי:</strong> ${car.zmig_ahori}<br>
+                <strong>⏳ טסט עד:</strong> ${car.mivchan_acharon_dt}
+            `;
+            resultDiv.style.display = 'block';
+        } else {
+            resultDiv.innerHTML = '❌ לא נמצאו פרטים עבור מספר רכב זה.';
+            resultDiv.style.display = 'block';
+        }
+    } catch (error) {
+        resultDiv.innerHTML = '⚠️ שגיאה בחיבור למאגר הנתונים.';
+        resultDiv.style.display = 'block';
+    } finally {
+        loader.style.display = 'none';
+    }
+}
+</script>
 
 </body>
 </html>
