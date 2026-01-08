@@ -1,0 +1,15 @@
+{
+  "short_name": "צמיגייה",
+  "name": "צמיגיית המקצוענים",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/1553/1553930.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "index.html",
+  "display": "standalone",
+  "theme_color": "#333333",
+  "background_color": "#ffffff"
+}
