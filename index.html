@@ -10,26 +10,23 @@
         h1 { margin: 0; font-size: 24px; font-weight: 800; }
         .container { padding: 0 20px; max-width: 500px; margin: 0 auto; }
         
-        .card { background: white; padding: 25px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); transition: all 0.3s ease; }
+        .card { background: white; padding: 25px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
         
         input { width: 100%; padding: 16px; font-size: 22px; border: 2px solid #dee2e6; border-radius: 12px; margin-bottom: 15px; text-align: center; box-sizing: border-box; background: #f8f9fa; font-weight: bold; outline: none; transition: border-color 0.3s; }
         input:focus { border-color: #ffc107; background: #fff; }
         
-        button.search-btn { background: #ffc107; border: none; padding: 16px; width: 100%; font-size: 20px; font-weight: 800; border-radius: 12px; cursor: pointer; color: #212529; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: transform 0.1s; }
-        button.search-btn:active { transform: scale(0.98); }
+        button.search-btn { background: #ffc107; border: none; padding: 16px; width: 100%; font-size: 20px; font-weight: 800; border-radius: 12px; cursor: pointer; color: #212529; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
 
         #res { display: none; margin-top: 20px; text-align: right; background: #fff; border-radius: 12px; border: 1px solid #e9ecef; overflow: hidden; }
         
-        .res-header { background: #e9ecef; color: #495057; padding: 10px; text-align: center; font-weight: bold; font-size: 16px; }
+        .res-header { background: #e9ecef; color: #495057; padding: 10px; text-align: center; font-weight: bold; }
         .res-body { padding: 15px; font-size: 17px; line-height: 1.6; }
         .res-row { display: flex; justify-content: space-between; border-bottom: 1px solid #f1f3f5; padding: 8px 0; }
-        .res-row:last-child { border-bottom: none; }
         .label { font-weight: 600; color: #868e96; }
         .value { font-weight: 800; color: #212529; }
         
-        /* כפתורים למטה */
         .actions { display: flex; gap: 10px; margin-top: 20px; }
-        .action-btn { flex: 1; padding: 15px; border-radius: 12px; font-weight: bold; font-size: 18px; border: none; cursor: pointer; color: white; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 5px; }
+        .action-btn { flex: 1; padding: 15px; border-radius: 12px; font-weight: bold; font-size: 18px; border: none; cursor: pointer; color: white; text-decoration: none; display: flex; align-items: center; justify-content: center; }
         .waze { background: #3498db; }
         .call { background: #2ecc71; }
 
@@ -44,7 +41,7 @@
     
     <div class="container">
         <div class="card">
-            <input type="tel" id="carNum" placeholder="מספר רכב (למשל 5495178)" onkeypress="if(event.key === 'Enter') checkCar()">
+            <input type="tel" id="carNum" placeholder="הכנס מספר רכב" autocomplete="off">
             <button class="search-btn" onclick="checkCar()">חפש רכב</button>
             
             <div id="loader" class="loader"></div>
@@ -52,7 +49,7 @@
         </div>
 
         <div class="actions">
-            <a href="waze://?q=צמיגיית המקצוענים" class="action-btn waze">📍 ניווט</a>
+            <a href="https://waze.com/ul?q=צמיגיית המקצוענים" class="action-btn waze">📍 ניווט</a>
             <a href="tel:0500000000" class="action-btn call">📞 חייג</a>
         </div>
         
@@ -61,13 +58,14 @@
 
 <script>
 async function checkCar() {
-    const num = document.getElementById('carNum').value.trim();
+    // 1. ניקוי הקלט - השארת ספרות בלבד
+    let num = document.getElementById('carNum').value.replace(/\D/g, '');
     const res = document.getElementById('res');
     const loader = document.getElementById('loader');
     const debug = document.getElementById('debug');
     
     if(!num || num.length < 5) {
-        alert("נא להזין מספר רכב תקין");
+        alert("נא להזין מספר רכב תקין (ספרות בלבד)");
         return;
     }
 
@@ -75,50 +73,43 @@ async function checkCar() {
     debug.innerText = '';
     loader.style.display = 'block';
 
-    // שימוש ב-AllOrigins בשיטת ה-Wrapper (הכי בטוחה מפני חסימות)
+    // הגדרות ה-API
     const resourceId = '053ad243-11e8-4242-ac28-58a74acad3b3';
-    const govUrl = `https://data.gov.il/api/3/action/datastore_search?resource_id=${resourceId}&q=${num}`;
-    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(govUrl)}`;
+    // שימוש בפילטר מדויק למניעת עומס
+    const govUrl = `https://data.gov.il/api/3/action/datastore_search?resource_id=${resourceId}&filters={"mispar_rechev":"${num}"}`;
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(govUrl)}&timestamp=${new Date().getTime()}`;
 
     try {
         const response = await fetch(proxyUrl);
-        const wrapperData = await response.json();
+        if (!response.ok) throw new Error('Network response was not ok');
         
-        // פתיחת ה"עטיפה" של הנתונים
+        const wrapperData = await response.json();
         const realData = JSON.parse(wrapperData.contents);
 
-        if (!realData.success) {
-            throw new Error('Gov API Error');
-        }
-
-        // חיפוש הרכב בתוצאות
-        const car = realData.result.records.find(r => String(r.mispar_rechev).includes(num));
-
-        if (car) {
+        if (realData.result && realData.result.records && realData.result.records.length > 0) {
+            const car = realData.result.records[0];
             const testDate = car.mivchan_acharon_dt ? new Date(car.mivchan_acharon_dt).toLocaleDateString('he-IL') : 'לא ידוע';
             
             res.innerHTML = `
-                <div class="res-header">✅ נמצאו פרטים</div>
+                <div class="res-header">✅ נמצאו פרטים למספר ${num}</div>
                 <div class="res-body">
-                    <div class="res-row"><span class="label">רכב:</span> <span class="value">${car.tozeret_nm} ${car.kinuy_mishari || ''}</span></div>
+                    <div class="res-row"><span class="label">דגם:</span> <span class="value">${car.tozeret_nm}</span></div>
                     <div class="res-row"><span class="label">שנה:</span> <span class="value">${car.shnat_yitzur}</span></div>
-                    <div class="res-row"><span class="label">צמיג קדמי:</span> <span class="value">${car.zmig_kidmi || 'חסר'}</span></div>
-                    <div class="res-row"><span class="label">צמיג אחורי:</span> <span class="value">${car.zmig_ahori || 'חסר'}</span></div>
+                    <div class="res-row"><span class="label">מידת צמיג:</span> <span class="value">${car.zmig_kidmi || 'לא רשום'}</span></div>
                     <div class="res-row"><span class="label">טסט עד:</span> <span class="value" style="color:#d63031">${testDate}</span></div>
                 </div>
             `;
             res.style.display = 'block';
         } else {
-            res.innerHTML = '<div style="padding:15px; color:#c0392b; font-weight:bold;">❌ הרכב לא נמצא במאגר. נסה מספר אחר.</div>';
+            res.innerHTML = '<div style="padding:15px; color:#c0392b; font-weight:bold;">❌ הרכב לא נמצא במאגר</div>';
             res.style.display = 'block';
         }
 
     } catch (error) {
-        console.error(error);
-        res.innerHTML = '<div style="padding:15px; color:#e67e22; font-weight:bold;">⚠️ המערכת עמוסה כרגע. נסה שוב.</div>';
+        console.error("Detailed error:", error);
+        res.innerHTML = '<div style="padding:15px; color:#e67e22; font-weight:bold;">⚠️ תקלה בחיבור לשרת הממשלתי. נסה שוב בעוד רגע.</div>';
         res.style.display = 'block';
-        // הדפסת שגיאה טכנית קטנה למטה כדי שנדע מה קרה אם זה נכשל
-        debug.innerText = 'Error: ' + error.message;
+        debug.innerText = 'שגיאה: ' + error.message;
     } finally {
         loader.style.display = 'none';
     }
