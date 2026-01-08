@@ -25,50 +25,60 @@
     </div>
 
 <script>
-// פונקציית העזר שתקבל את הנתונים מהממשלה
-function handleResponse(data) {
-    const res = document.getElementById('res');
-    const loader = document.getElementById('loader');
-    loader.style.display = 'none';
-    
-    if (data.result && data.result.records && data.result.records.length > 0) {
-        const car = data.result.records[0];
-        res.innerHTML = `
-            <div style="text-align:center; font-weight:bold; color:#d35400; margin-bottom:10px;">נתוני רכב</div>
-            <strong>🚗 דגם:</strong> ${car.tozeret_nm} ${car.kinuy_mishari || ''}<br>
-            <strong>📅 שנה:</strong> ${car.shnat_yitzur}<br>
-            <strong>📏 צמיג קדמי:</strong> ${car.zmig_kidmi || 'בדיקה פיזית'}<br>
-            <strong>📏 צמיג אחורי:</strong> ${car.zmig_ahori || 'בדיקה פיזית'}<br>
-            <strong>⏳ טסט עד:</strong> <span style="color:red; font-weight:bold;">${car.mivchan_acharon_dt ? car.mivchan_acharon_dt.split('T')[0] : 'לא ידוע'}</span>
-        `;
-        res.style.display = 'block';
-    } else {
-        res.innerHTML = '❌ מספר הרכב לא נמצא במאגר.';
-        res.style.display = 'block';
-    }
-}
-
-function checkCar() {
+async function checkCar() {
     const num = document.getElementById('carNum').value.trim();
     const res = document.getElementById('res');
     const loader = document.getElementById('loader');
     
     if(!num) return;
+
+    // איפוס תצוגה
     res.style.display = 'none';
+    res.innerHTML = '';
     loader.style.display = 'block';
 
-    // יצירת בקשת JSONP שעוקפת חסימות דפדפן
-    const script = document.createElement('script');
-    script.src = `https://data.gov.il/api/3/action/datastore_search?resource_id=053ad243-11e8-4242-ac28-58a74acad3b3&filters={"mispar_rechev":"${num}"}&callback=handleResponse`;
-    
-    // טיפול במקרה של שגיאה בטעינת הסקריפט
-    script.onerror = function() {
-        loader.style.display = 'none';
-        res.innerHTML = '⚠️ תקלה בחיבור למאגר הממשלתי. נסה שוב.';
+    try {
+        // כתובת המאגר הממשלתי
+        const govUrl = `https://data.gov.il/api/3/action/datastore_search?resource_id=053ad243-11e8-4242-ac28-58a74acad3b3&q=${num}`;
+        
+        // שימוש בפרוקסי מהיר שעוקף חסימות - CorsProxy.io
+        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(govUrl)}`;
+        
+        const response = await fetch(proxyUrl);
+        
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+
+        const data = await response.json();
+        
+        // בדיקה אם נמצאו רכבים וסינון התוצאה המדויקת
+        let car = null;
+        if (data.result.records.length > 0) {
+            car = data.result.records.find(r => String(r.mispar_rechev) === num);
+        }
+
+        if (car) {
+            res.innerHTML = `
+                <div style="text-align:center; font-weight:bold; color:#d35400; margin-bottom:10px;">✅ נמצא רכב במאגר</div>
+                <strong>🚗 דגם:</strong> ${car.tozeret_nm} ${car.kinuy_mishari || ''}<br>
+                <strong>📅 שנה:</strong> ${car.shnat_yitzur}<br>
+                <strong>📏 צמיג קדמי:</strong> ${car.zmig_kidmi || 'לא רשום'}<br>
+                <strong>📏 צמיג אחורי:</strong> ${car.zmig_ahori || 'לא רשום'}<br>
+                <strong>⏳ טסט עד:</strong> <span style="color:red; font-weight:bold;">${car.mivchan_acharon_dt ? car.mivchan_acharon_dt.split('T')[0] : 'לא ידוע'}</span>
+            `;
+            res.style.display = 'block';
+        } else {
+            res.innerHTML = '❌ מספר הרכב לא נמצא במאגר (בדוק שהמספר תקין).';
+            res.style.display = 'block';
+        }
+    } catch (error) {
+        console.error(error);
+        res.innerHTML = '⚠️ שגיאת תקשורת. נסה לרענן את הדף ולבדוק שוב.';
         res.style.display = 'block';
-    };
-    
-    document.body.appendChild(script);
+    } finally {
+        loader.style.display = 'none';
+    }
 }
 </script>
 </body>
