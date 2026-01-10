@@ -46,20 +46,15 @@
 </div>
 
 <script>
-// --- הלוגיקה של האפליקציה ---
-
-// מזהה המאגר הממשלתי המעודכן (חשוב!)
-const RESOURCE_ID = '053ad243-5e8d-4357-9447-aebac3052d92'; 
-
-function initSearch() {
-    // 1. קבלת המספר וניקוי רווחים
+async function initSearch() {
+    // 1. קבלת המספר וניקוי
     let num = document.getElementById('carNum').value.replace(/\D/g, '');
-    const res = document.getElementById('res');
+    const resDiv = document.getElementById('res');
     const loader = document.getElementById('loader');
     const errorMsg = document.getElementById('error-msg');
     
-    // איפוס המסך
-    res.style.display = 'none';
+    // איפוס תצוגה
+    resDiv.style.display = 'none';
     errorMsg.style.display = 'none';
     
     if(num.length < 5) {
@@ -69,53 +64,53 @@ function initSearch() {
 
     loader.style.display = 'block';
 
-    // 2. יצירת בקשה לשרת (JSONP)
-    const script = document.createElement('script');
-    script.src = `https://data.gov.il/api/3/action/datastore_search?resource_id=${RESOURCE_ID}&q=${num}&callback=handleGovData`;
-    
-    // טיפול במקרה של שגיאה בחיבור
-    script.onerror = () => {
+    // 2. הגדרת הכתובות עם "מתווך" (Proxy) לעקיפת חסימות
+    const resource_id = '053ad243-5e8d-4357-9447-aebac3052d92'; 
+    const govUrl = `https://data.gov.il/api/3/action/datastore_search?resource_id=${resource_id}&q=${num}`;
+    // שימוש ב-AllOrigins כדי למשוך את המידע בלי להיחסם
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(govUrl)}`;
+
+    try {
+        const response = await fetch(proxyUrl);
+        const data = await response.json();
+        
+        // AllOrigins מחזיר את המידע האמיתי בתוך שדה שנקרא contents
+        // אנחנו צריכים להפוך אותו בחזרה לאובייקט
+        const realData = JSON.parse(data.contents);
+
         loader.style.display = 'none';
-        errorMsg.innerText = 'שגיאה בחיבור לשרת הממשלתי';
+
+        if (!realData.success || realData.result.records.length === 0) {
+            errorMsg.innerText = '❌ הרכב לא נמצא במאגר';
+            errorMsg.style.display = 'block';
+            return;
+        }
+
+        // 3. הצגת הנתונים
+        const car = realData.result.records[0];
+        
+        // הכנת טקסט לוואטסאפ
+        const waText = `היי, פרטי הרכב שלך מ"צמיגיית המקצוענים":\nרכב: ${car.tozeret_nm} ${car.kinuy_mishari || ''}\nשנה: ${car.shnat_yitzur}\nגלגל קדמי: ${car.zmig_kidmi}\nגלגל אחורי: ${car.zmig_ahori}`;
+
+        resDiv.innerHTML = `
+            <div class="res-header">✅ פרטי רכב: ${car.mispar_rechev}</div>
+            <div class="res-body">
+                <div class="res-row"><span>דגם:</span> <b>${car.tozeret_nm}</b></div>
+                <div class="res-row"><span>שנה:</span> <b>${car.shnat_yitzur}</b></div>
+                <div class="res-row"><span>צמיג קדמי:</span> <b>${car.zmig_kidmi}</b></div>
+                <div class="res-row"><span>צמיג אחורי:</span> <b>${car.zmig_ahori}</b></div>
+                
+                <a href="https://wa.me/?text=${encodeURIComponent(waText)}" class="whatsapp-btn">💬 שלח בוואטסאפ</a>
+            </div>
+        `;
+        resDiv.style.display = 'block';
+
+    } catch (error) {
+        console.error(error);
+        loader.style.display = 'none';
+        errorMsg.innerText = 'שגיאה בתקשורת. נסה שוב מאוחר יותר.';
         errorMsg.style.display = 'block';
-    };
-    
-    document.body.appendChild(script);
-    
-    // מחיקת הסקריפט אחרי שימוש
-    setTimeout(() => { document.body.removeChild(script); }, 2000);
-}
-
-// 3. הפונקציה שמופעלת כשהנתונים חוזרים
-function handleGovData(data) {
-    document.getElementById('loader').style.display = 'none';
-
-    if (!data || !data.success || data.result.records.length === 0) {
-        document.getElementById('error-msg').innerText = '❌ הרכב לא נמצא במאגר';
-        document.getElementById('error-msg').style.display = 'block';
-        return;
     }
-
-    // שליפת הרכב הראשון שנמצא
-    const car = data.result.records[0];
-
-    // יצירת הטקסט לוואטסאפ
-    const waText = `היי, פרטי הרכב שלך: ${car.tozeret_nm} (${car.shnat_yitzur}). קדמי: ${car.zmig_kidmi}, אחורי: ${car.zmig_ahori}`;
-
-    // הצגת הנתונים על המסך
-    const resDiv = document.getElementById('res');
-    resDiv.innerHTML = `
-        <div class="res-header">✅ פרטי רכב: ${car.mispar_rechev}</div>
-        <div class="res-body">
-            <div class="res-row"><span>דגם:</span> <b>${car.tozeret_nm}</b></div>
-            <div class="res-row"><span>שנה:</span> <b>${car.shnat_yitzur}</b></div>
-            <div class="res-row"><span>צמיג קדמי:</span> <b>${car.zmig_kidmi}</b></div>
-            <div class="res-row"><span>צמיג אחורי:</span> <b>${car.zmig_ahori}</b></div>
-            
-            <a href="https://wa.me/?text=${encodeURIComponent(waText)}" class="whatsapp-btn">💬 שלח בוואטסאפ</a>
-        </div>
-    `;
-    resDiv.style.display = 'block';
 }
 </script>
 
